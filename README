@@ -1,0 +1,452 @@
+Llama-recipes for Rocm 
+
+llama-recipes for Rocm overview
+The 'llama-recipes' repository is a companion to the Llama 2 and Llama3  model. The goal of this repository is to provide a scalable library for fine-tuning Llama 2 and Llama3 models based on the AMD GPU, along with some example scripts and notebooks to quickly get started with using the Llama 2 models in a variety of use-cases, including fine-tuning for domain adaptation and building LLM-based applications with Llama 2 and other tools in the LLM ecosystem.  
+
+Key features 
+Introduction to Llama recipes and AMD GPU
+Llama recipes overview
+AMD GPU and ROCm overview
+Installation, building and deployment  
+Prerequisite
+Quick Start : Rocm & Pytorch Installation 
+Finetune with Llama Recipes
+PEFT with LoRA
+
+
+
+Rocm overview 
+ROCm is an open-source stack, composed primarily of open-source software, designed for graphics processing unit (GPU) computation. ROCm consists of a collection of drivers, development tools, and APIs that enable GPU programming from low-level kernel to end-user applications. ROCm is particularly well-suited to GPU-accelerated high-performance computing (HPC), artificial intelligence (AI), scientific computing, and computer aided design (CAD).
+ROCm supports programming models, such as OpenMP and OpenCL, and includes all necessary open source software compilers, debuggers, and libraries. ROCm is fully integrated into machine learning (ML) frameworks, such as PyTorch and TensorFlow.
+
+
+OS Support
+ Ubuntu 22.04/20.04
+ Red Hat Enterprise Linux 9.3/9.2/8.9/8.8
+ SUSE Linux Enterprise Server 15.5/15.4
+
+
+AMD GPU overview 
+The AMD Instinct™ MI300X discrete GPU is based on next-generation AMD CDNA™ 3 architecture, delivering leadership efficiency and performance for the most demanding AI and HPC applications. It is designed with 304 high throughput compute units, AI-specific functions including new data-type support, photo and video decoding, plus an unprecedented 192 GB of HBM3 memory on a GPU accelerator. Using state-of-the-art die stacking and chiplet technology in a multi-chip package propels generative AI, machine learning, and inferencing, while extending AMD leadership in HPC acceleration. The MI300X offers outstanding performance to our prior generation that is already powering the fastest exabyte-class supercomputer, offering 13.7x the peak AI/ML workload performance using FP8 with sparsity compared to prior AMD MI250X* accelerators using FP16 and a 3.4x peak advantage for HPC workloads on FP32 calculations.
+
+
+ 
+2.Installation, building and deployment  
+   
+Prerequisites
+Before installing ROCm, complete the following prerequisites.
+
+1.Confirm the system has a supported Linux version.
+a. To obtain the Linux distribution information, type the following command on your system from the Command Line Interface (CLI):
+uname -m && cat /etc/*release
+b. Confirm that your Linux distribution matches a supported distribution.
+Example: Running the preceding command on an Ubuntu system produces the following output:
+x86_64
+DISTRIB_ID=Ubuntu
+DISTRIB_RELEASE=20.04
+DISTRIB_CODENAME=focal
+DISTRIB_DESCRIPTION="Ubuntu 20.04.5 LTS"
+
+2.Verify the kernel version.
+To check the kernel version of your Linux system, type the following command:
+uname -srmv
+Example: The preceding command lists the kernel version in the following format:
+Linux 5.15.0-46-generic #44~20.04.5-Ubuntu SMP Fri Jun 24 13:27:29 UTC 2022 x86_64
+Confirm that your kernel version matches the system requirements, as listed in Supported operating systems.
+
+
+Additional package repositories
+On some distributions the ROCm packages depend on packages outside the default package repositories. These extra repositories need to be enabled before installation. Follow the instructions below based on your distributions.
+For Ubuntu, All packages are available in the default Ubuntu repositories, therefore no additional repositories need to be added. 
+For other distributions, please refer to the following link for guidance,
+Installation prerequisites — ROCm installation (Linux) (amd.com)
+
+Kernel headers and development packages
+The driver package uses DKMS (Dynamic Kernel Module Support) to build the amdgpu-dkms module (driver) for the installed kernels.
+To install for the currently active kernel run the command corresponding to your distribution.
+For Ubuntu,
+
+sudo apt install "linux-headers-$(uname -r)" "linux-modules-extra-$(uname -r)"
+
+For other distrbutions, please refer to the following link for guidance,
+Installation prerequisites — ROCm installation (Linux) (amd.com)
+
+Setting permissions for groups
+This section provides steps to add any current user to a video group to access GPU resources. Use of the video group is recommended for all ROCm-supported operating systems.
+To check the groups in your system, issue the following command:
+groups
+
+
+Add yourself to the render and video group using the command:
+sudo usermod -a -G render,video $LOGNAME
+
+
+To add all future users to the video and render groups by default, run the following commands:
+echo 'ADD_EXTRA_GROUPS=1' | sudo tee -a /etc/adduser.conf
+echo 'EXTRA_GROUPS=video' | sudo tee -a /etc/adduser.conf
+echo 'EXTRA_GROUPS=render' | sudo tee -a /etc/adduser.conf
+
+
+
+
+Installation 
+ROCm supports two methods for installation:
+Using the Linux distribution package manager
+Running the amdgpu-install script
+There is no difference in the final installation between these two methods
+Installation via AMDGPU installer 
+Make sure that the Installation prerequisites are met before installing.
+
+sudo apt update
+wget https://repo.radeon.com/amdgpu-install/6.0.2/ubuntu/focal/amdgpu-install_6.0.60002-1_all.deb
+sudo apt install ./amdgpu-install_6.0.60002-1_all.deb
+
+
+
+
+
+For other distributions,please refer to the following link,
+Installation via AMDGPU installer — ROCm installation (Linux)
+
+Post-installation instructions
+Configure the system linker.
+Instruct the system linker where to find shared objects (.so-files) for ROCm applications.
+sudo tee --append /etc/ld.so.conf.d/rocm.conf <<EOF
+/opt/rocm/lib
+/opt/rocm/lib64
+EOF
+sudo ldconfig
+
+
+Configure PATH.
+Add binary paths to the PATH environment variable.
+export PATH=$PATH:/opt/rocm-6.0.2/bin
+
+
+Verify kernel-mode driver installation.
+dkms status
+
+
+Verify ROCm installation.
+/opt/rocm-6.0.2/bin/rocminfo
+/opt/rocm-6.0.2/bin/clinfo
+
+
+Verify package installation.
+Ubuntu
+sudo apt list --installed
+
+
+
+Installing Pytorch for Rocm 
+
+PyTorch is an open-source tensor library designed for deep learning. PyTorch on ROCm provides mixed-precision and large-scale training using our MIOpen and RCCL libraries.
+To install PyTorch for ROCm, you have the following options:
+Using a Docker image with PyTorch pre-installed (recommended)
+Using a wheels package
+Using the PyTorch ROCm base Docker image
+Using the PyTorch upstream Docker file
+The recommended way is to make use of the pre-installed docker image.
+
+docker pull rocm/pytorch:latest
+
+docker run -it --cap-add=SYS_PTRACE --security-opt seccomp=unconfined \
+--device=/dev/kfd --device=/dev/dri --group-add video \
+--ipc=host --shm-size 8G rocm/pytorch:latest
+
+Other alternative ways, please refer to the following link,
+Installing PyTorch for ROCm — ROCm installation (Linux) (amd.com)
+
+
+
+Validate the PyTorch installation
+
+1.Clone the PyTorch examples repository.
+git clone https://github.com/pytorch/examples.git
+
+
+
+
+2.Go to the vision transformer example folder.
+cd examples/vision_transformer
+
+
+3.Follow the instructions in the README.md file in this folder to install the requirements. Then run:
+python3 main.py
+
+
+This generates the following output:
+
+
+
+
+
+3.Finetune with Llama Recipes
+
+
+llama-recipes/recipes/finetuning at main · meta-llama/llama-recipes (github.com)
+Finetuning Llama
+PyTorch Nightlies
+Some features (especially fine-tuning with FSDP + PEFT) currently require PyTorch nightlies to be installed. Please make sure to install the nightlies if you're using these features following this guide.
+
+After login successfully, in the command line GUI,
+
+Step 1  Pull the pytorch-nightly docker 
+Docker pull rocm/pytorch-nightly:latest
+
+Step 2  Download the huggingface model 
+pip install -U "huggingface_hub[cli]"
+
+huggingface-cli login
+
+huggingface-cli download --resume-download NousResearch/Llama-2-7b-chat-hf --local-dir llama2-7b
+
+Step 3
+
+pip install pandas datasets torch peft transformers==4.40.0  trl==0.4.7 accelerate scipy wandb 
+
+
+
+
+Step 4  Install rocm-bitsandbytes
+Git clone https://github.com/Lzy17/bitsandbytes-rocm.git
+cd bitsandbytes-rocm
+Make hip 
+
+
+python setup.py install
+
+Step 5 
+ Git clone https://github.com/meta-llama/llama-recipes.git
+
+
+
+Single GPU
+Step 6  Launch the pytorch docker and  specify the GPU IDs
+docker run -it --cap-add=SYS_PTRACE --security-opt seccomp=unconfined --device=/dev/kfd --device=/dev/dri/renderD176  -v /home/huggingface/hc/workspace:/workspace --device=/dev/dri --group-add video --ipc=host --shm-size 8G rocm/pytorch-nightly:latest 
+
+
+Step 7  Inside the docker container
+
+pip install -r requirements.txt
+
+Pip install –e .
+
+Step 7 
+PEFT+LoRA
+python -m llama_recipes.finetuning --use_peft --peft_method lora --quantization --model_name /workspace/llama2-7b --output_dir /workspace/PEFT/model --use_wandb
+
+
+
+
+
+
+
+
+Multiple GPU
+
+Step 6  Lanuch the pytorch docker and  specify the GPU IDs. Here, two MI300 GPUs are specified as training resources. 
+
+docker run -it --cap-add=SYS_PTRACE --security-opt seccomp=unconfined --device=/dev/kfd --device=/dev/dri/renderD176 --device=/dev/dri/renderD184 -v /home/huggingface/hc/workspace:/workspace --device=/dev/dri --group-add video --ipc=host --shm-size 8G rocm/pytorch-nightly:latest 
+
+
+Step 7  Inside the docker container
+
+pip install -r requirements.txt
+
+Pip install –e .
+
+Step 7 
+PEFT+LoRA
+python -m llama_recipes.finetuning --use_peft --peft_method lora --quantization --model_name /workspace/llama2-7b --output_dir /workspace/PEFT/model --use_wandb
+
+In the process of training, 
+
+Wandb view 
+
+
+
+
+
+
+
+
+Issues
+
+Bitsandbytes error
+
+Solution 
+python -m bitsandbytes
+
+
+
+export LD_LIBRARY_PATH=$LD_LIBRARY_PATH:/usr/local/lib
+source ~/.bashrc
+python -m bitsandbytes
+
+
+
+
+
+Llama3 fine-tuning 
+https://github.com/meta-llama/llama-recipes.git
+
+Single GPU 
+
+
+Multiple GPU 
+llama3-8b 
+Step 1  launch the docker at first
+/***8 MI300X GPUs here ***/ 
+
+docker run -it --cap-add=SYS_PTRACE --security-opt seccomp=unconfined --device=/dev/kfd --device=/dev/dri/renderD144 --device=/dev/dri/renderD152  --device=/dev/dri/renderD136 --device=/dev/dri/renderD128  --device=/dev/dri/renderD176 --device=/dev/dri/renderD184 --device=/dev/dri/renderD168 --device=/dev/dri/renderD160  -v /home/huggingface/:/workspace --device=/dev/dri --group-add video --ipc=host --shm-size 32G rocm/pytorch-nightly:latest
+
+Step 2  install the required dependencies.
+2.1 install llama-recipes 
+git clone https://github.com/meta-llama/llama-recipes.git
+cd llama-recipes
+pip install -r requirements.txt 
+pip install -U pip setuptools
+pip install -e .
+
+
+2.2 install rocm-bitsandbytes
+
+
+git clone --recurse https://github.com/ROCm/bitsandbytes
+cd bitsandbytes
+git checkout rocm_enabled
+pip install -r requirements-dev.txt
+cmake -DCOMPUTE_BACKEND=hip -S . (Use -DBNB_ROCM_ARCH="gfx90a;gfx942" to target specific gpu arch)
+make
+pip install -e . 
+
+
+
+
+
+
+Post installation Steps
+export LD_LIBRARY_PATH=$LD_LIBRARY_PATH:/usr/local/lib
+source ~/.bashrc
+python -m bitsandbytes
+
+
+2.3 install other dependencies 
+pip install pandas datasets torch peft transformers==4.40.0  trl==0.4.7 accelerate scipy wandb 
+
+
+Step 3  Initiate the fine-tuning process  
+3.1 wandb login
+
+
+3.2 run the llama fine-tuning scripts
+
+Experiment01: Make a try for 20 epochs 
+ cd llama-recipes 
+ python3 -m llama_recipes.finetuning --use_peft --peft_method lora  --quantization --num_epochs 20  --model_name /workspace/hc/models/unsloth-llama3-8b --output_dir /workspace/hc/models/unsloth-llama3-8b/PEFT/expm01-epochs_20 --use_wandb 
+
+
+
+
+When the training process is initiated, it should generate the following output in the terminal window. 
+
+The Wandb view 
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+llama3-70b  
+Step 1  launch the docker at first
+/***8 MI300X GPUs here ***/ 
+
+docker run -it --cap-add=SYS_PTRACE --security-opt seccomp=unconfined --device=/dev/kfd --device=/dev/dri/renderD144 --device=/dev/dri/renderD152  --de
+vice=/dev/dri/renderD136 --device=/dev/dri/renderD128  --device=/dev/dri/renderD176 --device=/dev/dri/renderD184 --device=/dev/dri/renderD168 --device=/dev/dri/renderD160  -v  /:/workspace --device=/dev/dri --group-add video --ipc=host --shm-size 32G rocm/pytorch-nightly:latest
+
+Step 2  install the required dependencies.
+2.1 install llama-recipes 
+git clone https://github.com/meta-llama/llama-recipes.git
+cd llama-recipes
+pip install -r requirements.txt 
+pip install -U pip setuptools
+pip install -e .
+
+
+2.2 install rocm-bitsandbytes
+
+
+git clone --recurse https://github.com/ROCm/bitsandbytes
+cd bitsandbytes
+git checkout rocm_enabled
+pip install -r requirements-dev.txt
+cmake -DCOMPUTE_BACKEND=hip -S . (Use -DBNB_ROCM_ARCH="gfx90a;gfx942" to target specific gpu arch)
+make
+pip install -e . 
+
+
+
+
+
+
+Post installation Steps
+export LD_LIBRARY_PATH=$LD_LIBRARY_PATH:/usr/local/lib
+source ~/.bashrc
+python -m bitsandbytes
+
+
+2.3 install other dependencies 
+pip install pandas datasets torch peft transformers==4.40.0  trl==0.4.7 accelerate scipy wandb 
+
+
+Step 3  Initiate the fine-tuning process  
+3.1 wandb login
+
+
+3.2 run the llama fine-tuning scripts
+ python3 -m llama_recipes.finetuning --use_peft --peft_method lora  --quantization --num_epochs 20  --model_name /workspace/models/hugging-face-models/meta-llama3-70B  --output_dir /workspace/home/hc/models/llama3-70b/PEFT/expm01-epochs_20  --use_wandb
+
+Issues when initiating the training process:
+Error info
+/opt/conda/envs/py_3.8/lib/python3.8/site-packages/torch/_dynamo/external_utils.py:36: UserWarning: torch.utils.checkpoint: the use_reentrant parameter should be passed explicitly. In version 2.4 we will raise an exception if use_reentrant is not passed. use_reentrant=False is recommended, but if you need to preserve the current default behavior, you can pass use_reentrant=True. Refer to docs for more details on the differences between the two variants.
+  return fn(*args, **kwargs)
+/workspace/hc/workspace/bitsandbytes/bitsandbytes/autograd/_functions.py:319: UserWarning: MatMul8bitLt: inputs will be cast from torch.float32 to float16 during quantization
+  warnings.warn(f"MatMul8bitLt: inputs will be cast from {A.dtype} to float16 during quantization")
+/opt/conda/envs/py_3.8/lib/python3.8/site-packages/transformers/models/llama/modeling_llama.py:671: UserWarning: 1Torch was not compiled with memory efficient attention. (Triggered internally at /tmp/pytorch/aten/src/ATen/native/transformers/hip/sdp_utils.cpp:505.)
+
+
+Possible Solutions
+Add support for Flash Attention for AMD/ROCm · Issue #112997 · pytorch/pytorch (github.com)
+To solve the UserWarning: 1Torch was not compiled with memory efficient attention. (Triggered internally at /tmp/pytorch/aten/src/ATen/native/transformers/hip/sdp_utils.cpp:505.)
+
+I will try to figure it out by adding the FA support for the current docker and re-run
+it. 
+ROCm/flash-attention at flash_attention_for_rocm2 (github.com)
+
+When running the meta-llama3-70B-instruct model,
+
+python3 -m llama_recipes.finetuning --use_peft --peft_method lora  --quantization --num_epochs 20  --model_name /workspace/models/hugging-face-models/meta-llama3-70B-instruct  --output_dir /workspace/home/hc/models/llama3-70b-instruct/PEFT/expm01-epochs_20 --use_wandb 
+
+/workspace/models/hugging-face-models/meta-llama3-70B-instruct
+
+
+
+
+
+
+Issues
+
+urllib3 ImportError: cannot import name 'DEFAULT_CIPHERS' from 'urllib3.util.ssl_' (/opt/conda/envs/py_3.8/lib/python3.8/site-packages/urllib3/util/ssl_.py)
+
+     Solution 
+      pip uninstall urllib3
+      pip install 'urllib3<2'
